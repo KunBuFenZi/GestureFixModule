@@ -1,5 +1,8 @@
 package com.gesturefix;
 
+import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.WindowManager;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -22,7 +25,29 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                 lpparam.classLoader
             );
 
-            // Hook getGestureStubWindowParam，返回后修正参数
+            // Hook 构造函数，窗口刚创建时就修正，解决软重启后失效问题
+            XposedHelpers.findAndHookConstructor(
+                gestureStubViewClass,
+                Context.class,
+                new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                        XposedBridge.log("[GestureFix] GestureStubView constructed, scheduling fix");
+                        final Object thiz = param.thisObject;
+                        Handler handler = new Handler(Looper.getMainLooper());
+                        handler.postDelayed(() -> {
+                            fixLayoutParams(thiz);
+                            try {
+                                XposedHelpers.callMethod(thiz, "resetRenderProperty", "GestureFixForce");
+                            } catch (Throwable t) {
+                                XposedBridge.log("[GestureFix] force reset error: " + t.getMessage());
+                            }
+                        }, 500);
+                    }
+                }
+            );
+
+            // Hook getGestureStubWindowParam
             XposedHelpers.findAndHookMethod(
                 gestureStubViewClass,
                 "getGestureStubWindowParam",
@@ -34,7 +59,7 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                 }
             );
 
-            // Hook resetRenderProperty，每次窗口刷新前也修正
+            // Hook resetRenderProperty
             XposedHelpers.findAndHookMethod(
                 gestureStubViewClass,
                 "resetRenderProperty",
@@ -47,7 +72,7 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                 }
             );
 
-            // Hook setGestureStubPosition，位置变化时也修正
+            // Hook setGestureStubPosition
             XposedHelpers.findAndHookMethod(
                 gestureStubViewClass,
                 "setGestureStubPosition",
@@ -83,10 +108,8 @@ public class GestureFixHook implements IXposedHookLoadPackage {
             int fullHeight = (rotation == 0 || rotation == 2) ? screenHeight : screenWidth;
 
             XposedBridge.log("[GestureFix] Before fix: y=" + lp.y + " h=" + lp.height + " title=" + title);
-
             lp.y = 0;
             lp.height = fullHeight;
-
             XposedBridge.log("[GestureFix] After fix:  y=" + lp.y + " h=" + lp.height);
 
         } catch (Throwable t) {
