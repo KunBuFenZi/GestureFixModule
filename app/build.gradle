@@ -14,9 +14,22 @@ android {
         versionName "1.0"
     }
 
+    signingConfigs {
+        fixed {
+            storeFile file('../gesturefix.jks')
+            storePassword 'gesturefix123'
+            keyAlias 'gesturefix'
+            keyPassword 'gesturefix123'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.fixed
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.fixed
         }
     }
 
