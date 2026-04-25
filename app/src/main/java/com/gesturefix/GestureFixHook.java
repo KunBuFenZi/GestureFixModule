@@ -24,7 +24,7 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                 lpparam.classLoader
             );
 
-            // Hook 构造函数，窗口刚创建时就修正，解决软重启后失效问题
+            // Hook 构造函数，软重启时窗口刚创建就修正旋转和参数
             XposedHelpers.findAndHookConstructor(
                 gestureStubViewClass,
                 Context.class,
@@ -35,13 +35,23 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                         final Object thiz = param.thisObject;
                         View view = (View) thiz;
                         view.postDelayed(() -> {
+                            // 先触发旋转适配，确保横屏时方向正确
+                            try {
+                                XposedHelpers.callMethod(thiz, "adaptRotation", false);
+                                XposedBridge.log("[GestureFix] adaptRotation called");
+                            } catch (Throwable t) {
+                                XposedBridge.log("[GestureFix] adaptRotation error: " + t.getMessage());
+                            }
+                            // 修正窗口参数
                             fixLayoutParams(thiz);
+                            // 刷新窗口
                             try {
                                 XposedHelpers.callMethod(thiz, "resetRenderProperty", "GestureFixForce");
+                                XposedBridge.log("[GestureFix] resetRenderProperty called");
                             } catch (Throwable t) {
                                 XposedBridge.log("[GestureFix] force reset error: " + t.getMessage());
                             }
-                        }, 500);
+                        }, 800);
                     }
                 }
             );
@@ -106,7 +116,7 @@ public class GestureFixHook implements IXposedHookLoadPackage {
 
             int fullHeight = (rotation == 0 || rotation == 2) ? screenHeight : screenWidth;
 
-            XposedBridge.log("[GestureFix] Before fix: y=" + lp.y + " h=" + lp.height + " title=" + title);
+            XposedBridge.log("[GestureFix] Before fix: y=" + lp.y + " h=" + lp.height + " title=" + title + " rotation=" + rotation);
             lp.y = 0;
             lp.height = fullHeight;
             XposedBridge.log("[GestureFix] After fix:  y=" + lp.y + " h=" + lp.height);
