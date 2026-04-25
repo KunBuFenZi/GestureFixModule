@@ -1,6 +1,7 @@
 package com.gesturefix;
 
 import android.content.Context;
+import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 
@@ -24,7 +25,7 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                 lpparam.classLoader
             );
 
-            // Hook 构造函数，软重启时窗口刚创建就修正旋转和参数
+            // Hook 构造函数
             XposedHelpers.findAndHookConstructor(
                 gestureStubViewClass,
                 Context.class,
@@ -35,19 +36,14 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                         final Object thiz = param.thisObject;
                         View view = (View) thiz;
                         view.postDelayed(() -> {
-                            // 先触发旋转适配，确保横屏时方向正确
                             try {
                                 XposedHelpers.callMethod(thiz, "adaptRotation", false);
-                                XposedBridge.log("[GestureFix] adaptRotation called");
                             } catch (Throwable t) {
                                 XposedBridge.log("[GestureFix] adaptRotation error: " + t.getMessage());
                             }
-                            // 修正窗口参数
                             fixLayoutParams(thiz);
-                            // 刷新窗口
                             try {
                                 XposedHelpers.callMethod(thiz, "resetRenderProperty", "GestureFixForce");
-                                XposedBridge.log("[GestureFix] resetRenderProperty called");
                             } catch (Throwable t) {
                                 XposedBridge.log("[GestureFix] force reset error: " + t.getMessage());
                             }
@@ -110,16 +106,42 @@ public class GestureFixHook implements IXposedHookLoadPackage {
             String title = lp.getTitle() != null ? lp.getTitle().toString() : "";
             if (!title.contains("GestureStubLeft") && !title.contains("GestureStubRight")) return;
 
+            boolean isLeft = title.contains("GestureStubLeft");
             int screenHeight = XposedHelpers.getIntField(thiz, "mScreenHeight");
             int screenWidth  = XposedHelpers.getIntField(thiz, "mScreenWidth");
             int rotation     = XposedHelpers.getIntField(thiz, "mRotation");
+            int stubSize     = XposedHelpers.getIntField(thiz, "mGestureStubSize");
 
-            int fullHeight = (rotation == 0 || rotation == 2) ? screenHeight : screenWidth;
+            XposedBridge.log("[GestureFix] Before fix: x=" + lp.x + " y=" + lp.y
+                + " w=" + lp.width + " h=" + lp.height
+                + " gravity=" + lp.gravity
+                + " title=" + title + " rotation=" + rotation);
 
-            XposedBridge.log("[GestureFix] Before fix: y=" + lp.y + " h=" + lp.height + " title=" + title + " rotation=" + rotation);
-            lp.y = 0;
-            lp.height = fullHeight;
-            XposedBridge.log("[GestureFix] After fix:  y=" + lp.y + " h=" + lp.height);
+            if (rotation == 0 || rotation == 2) {
+                // 竖屏：左右手势条，竖向贴边
+                lp.width = stubSize;
+                lp.height = screenHeight;
+                lp.x = 0;
+                lp.y = 0;
+                lp.gravity = isLeft
+                    ? (Gravity.LEFT | Gravity.TOP)
+                    : (Gravity.RIGHT | Gravity.TOP);
+            } else {
+                // 横屏 (rotation=1 或 3)：左右手势条，横向时屏幕宽高对调
+                // screenWidth 是短边，screenHeight 是长边
+                // 横屏时实际显示宽=screenHeight，高=screenWidth
+                lp.width = stubSize;
+                lp.height = screenHeight; // 横屏时高度用长边
+                lp.x = 0;
+                lp.y = 0;
+                lp.gravity = isLeft
+                    ? (Gravity.LEFT | Gravity.TOP)
+                    : (Gravity.RIGHT | Gravity.TOP);
+            }
+
+            XposedBridge.log("[GestureFix] After fix:  x=" + lp.x + " y=" + lp.y
+                + " w=" + lp.width + " h=" + lp.height
+                + " gravity=" + lp.gravity);
 
         } catch (Throwable t) {
             XposedBridge.log("[GestureFix] fixLayoutParams error: " + t.getMessage());
