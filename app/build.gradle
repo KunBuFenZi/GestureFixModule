@@ -24,6 +24,12 @@ android {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
+
+    configurations.all {
+        resolutionStrategy {
+            force 'com.android.tools:r8:8.2.47'
+        }
+    }
 }
 
 dependencies {
