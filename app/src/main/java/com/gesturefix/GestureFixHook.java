@@ -1,8 +1,7 @@
 package com.gesturefix;
 
 import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
+import android.view.View;
 import android.view.WindowManager;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -34,8 +33,8 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         XposedBridge.log("[GestureFix] GestureStubView constructed, scheduling fix");
                         final Object thiz = param.thisObject;
-                        Handler handler = new Handler(Looper.getMainLooper());
-                        handler.postDelayed(() -> {
+                        View view = (View) thiz;
+                        view.postDelayed(() -> {
                             fixLayoutParams(thiz);
                             try {
                                 XposedHelpers.callMethod(thiz, "resetRenderProperty", "GestureFixForce");
