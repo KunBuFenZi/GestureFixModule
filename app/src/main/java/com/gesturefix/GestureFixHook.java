@@ -40,9 +40,14 @@ public class GestureFixHook implements IXposedHookLoadPackage {
                         View view = (View) param.args[0];
                         int screenHeight = XposedHelpers.getIntField(view, "mScreenHeight");
                         int screenWidth  = XposedHelpers.getIntField(view, "mScreenWidth");
-                        int rotation     = XposedHelpers.getIntField(view, "mRotation");
                         int stubSize     = XposedHelpers.getIntField(view, "mGestureStubSize");
                         if (stubSize <= 0) stubSize = Math.min(lp.width, lp.height);
+
+                        // Use actual display rotation instead of mRotation field, which may be
+                        // stale after soft reboot or screen wake before adaptRotation runs.
+                        android.view.Display display = view.getDisplay();
+                        int rotation = (display != null) ? display.getRotation()
+                                                         : XposedHelpers.getIntField(view, "mRotation");
 
                         // mScreenWidth = short side (1840), mScreenHeight = long side (2944), constant regardless of rotation.
                         // portrait (0/2): display height = long side; landscape (1/3): display height = short side.
